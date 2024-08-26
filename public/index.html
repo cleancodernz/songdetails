@@ -1,0 +1,184 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Current Spotify Song</title>
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+    <style type="text/css">
+      #login, #loggedin {
+        display: none;
+      }
+      .text-overflow {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        width: 500px;
+      }
+    </style>
+  </head>
+
+  <body 
+   style="
+    background: rgb(131,58,180);
+background: linear-gradient(90deg, rgba(131,58,180,1) 0%, rgba(253,29,29,1) 50%, rgba(252,176,69,1) 100%); 
+   "
+  >
+    <div class="container">
+      <div id="login">
+        <h1>Current Song Details</h1>
+        <a href="/login" class="btn btn-primary">Log in with Spotify</a>
+      </div>
+      <div id="loggedin">
+        <div id="user-profile">
+        </div>
+        <div id="oauth">
+        </div>        
+      </div>
+    </div>
+
+    <script id="user-profile-template" type="text/x-handlebars-template">	
+	  <br><br>	
+      <div class="media">
+        <div class="pull-left">
+          <img class="media-object" width="400" src="{{item.album.images.0.url}}" />
+        </div>
+		<br>
+        <div style="vertical-align:bottom;">
+			<br><br><br><br><br><br><br><br><br><br><br><br>
+          <dl>			
+            <dt><p style="font-family:Arial, Helvetica, sans-serif; font-size:45px; color:white">{{item.name}}</p></dt>
+			<br>
+            <dt><p style="font-family:Arial, Helvetica, sans-serif; font-size:25px; color:white">{{item.album.artists.0.name}}</p></dt>			   			
+          </dl>
+        </div>
+      </div>
+    </script>
+	
+	<script id="oauth-template" type="text/x-handlebars-template">      		
+		  <dl class="dl-horizontal">
+			<dt style="opacity: 0;">Access token</dt><dd class="text-overflow" style="opacity: 0.2; color:red" id="access_token_val">{{access_token}}</dd>
+			<dt style="opacity: 0;">Refresh token</dt><dd class="text-overflow" style="opacity: 0.2; color:red" id="refresh_token_val">{{refresh_token}}</dd>
+		  </dl>
+    </script>
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/handlebars.js/2.0.0-alpha.1/handlebars.min.js"></script>
+    <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+	<script>
+		$(document).ready(function(){
+				copyTokenToBody();
+		
+				function refresh(){
+					var div = $('#media'),
+						divHtml = div.html();
+
+					div.html(divHtml);
+				}
+
+				setInterval(function(){
+					loadSpotifyData();
+					refresh();
+				}, 7000);
+				
+				setInterval(function(){					
+					refreshToken();
+				}, 2700000 );
+			})
+	
+	  // Copy token from querystring to body
+	  function copyTokenToBody(){
+		var oauthSource = document.getElementById('oauth-template').innerHTML,
+            oauthTemplate = Handlebars.compile(oauthSource),
+            oauthPlaceholder = document.getElementById('oauth');
+			
+		var params = getHashParams();
+		
+		var access_token = params.access_token,
+            refresh_token = params.refresh_token,
+            error = params.error;		
+		
+		if (error) {
+          alert('There was an error during the authentication');
+        } else {
+          if (access_token) {
+			oauthPlaceholder.innerHTML = oauthTemplate({
+					access_token: access_token,
+					refresh_token: refresh_token
+				  });
+		  } else {
+              // render initial screen
+              $('#login').show();
+              $('#loggedin').hide();
+          }	
+		}
+	  }
+	 
+	  // refresh the token
+	  function refreshToken() {			
+			var oauthSource = document.getElementById('oauth-template').innerHTML,
+            oauthTemplate = Handlebars.compile(oauthSource),
+            oauthPlaceholder = document.getElementById('oauth');
+	  
+			var access_token = document.getElementById('access_token_val').innerHTML,
+            refresh_token = document.getElementById('refresh_token_val').innerHTML;
+	  
+			$.ajax({
+			  url: '/refresh_token',
+			  data: {
+				'refresh_token': refresh_token
+			  }
+			}).done(function(data) {
+			  access_token = data.access_token;
+			  oauthPlaceholder.innerHTML = oauthTemplate({
+				access_token: access_token,
+				refresh_token: refresh_token
+			  });
+			});
+          }
+		  
+	  /**
+         * Obtains parameters from the hash of the URL
+         * @return Object
+         */
+        function getHashParams() {
+          var hashParams = {};
+          var e, r = /([^&;=]+)=?([^&;]*)/g,
+              q = window.location.hash.substring(1);
+          while ( e = r.exec(q)) {
+             hashParams[e[1]] = decodeURIComponent(e[2]);
+          }
+          return hashParams;
+        }
+	
+	 // Load spotify data
+      function loadSpotifyData() {
+		
+        var userProfileSource = document.getElementById('user-profile-template').innerHTML,
+            userProfileTemplate = Handlebars.compile(userProfileSource),
+            userProfilePlaceholder = document.getElementById('user-profile');
+		
+        var access_token = document.getElementById('access_token_val').innerHTML,
+            refresh_token = document.getElementById('refresh_token_val').innerHTML;
+	   	
+          if (access_token) {
+            $.ajax({
+                url: 'https://api.spotify.com/v1/me/player',
+                headers: {
+                  'Authorization': 'Bearer ' + access_token
+                },
+                success: function(response) {
+                  userProfilePlaceholder.innerHTML = userProfileTemplate(response);
+
+                  $('#login').hide();
+                  $('#loggedin').show();
+                }
+            });
+          } else {
+              // render initial screen
+              $('#login').show();
+              $('#loggedin').hide();
+          }
+
+      }
+    </script>
+  </body>
+</html>
+
